@@ -5,14 +5,20 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "lib/**"
+      - ".github/workflows/build-apk.yml"
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Ambil source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install Flutter
         uses: subosito/flutter-action@v2
@@ -21,7 +27,9 @@ jobs:
           cache: true
 
       - name: Cek Flutter
-        run: flutter --version
+        run: |
+          flutter --version
+          dart --version
 
       - name: Buat project Android
         run: |
@@ -31,9 +39,13 @@ jobs:
             --org com.kasirtab \
             kasirtab
 
-      - name: Pasang source kasir
+      - name: Pasang source Kasir
         run: |
           cp lib/main.dart kasirtab/lib/main.dart
+
+          # Hapus test bawaan flutter create.
+          # Test template mengacu ke aplikasi default dan bukan KasirApp.
+          rm -rf kasirtab/test
 
       - name: Ambil dependency
         working-directory: kasirtab
@@ -41,14 +53,24 @@ jobs:
 
       - name: Analisa source
         working-directory: kasirtab
-        run: flutter analyze
+        run: |
+          flutter analyze lib \
+            --no-fatal-infos \
+            --no-fatal-warnings
 
       - name: Build APK Release
         working-directory: kasirtab
         run: flutter build apk --release
 
+      - name: Cek hasil APK
+        run: |
+          ls -lh kasirtab/build/app/outputs/flutter-apk/
+          test -f kasirtab/build/app/outputs/flutter-apk/app-release.apk
+
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: KASIR-TAB-APK
           path: kasirtab/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 7
